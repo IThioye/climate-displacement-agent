@@ -140,7 +140,12 @@ class TokenBudget:
         self.tool_calls: dict[str, int] = {}
 
     def record_tokens(self, model: str, tokens_in: int, tokens_out: int) -> float:
-        price_in, price_out = self.PRICING.get(model, self.DEFAULT)
+        # Lab B4 reports provider cost. Local Ollama inference has no API charge;
+        # hardware/electricity are outside this token-price estimate.
+        price_in, price_out = (
+            (0.0, 0.0) if model.startswith("ollama:")
+            else self.PRICING.get(model, self.DEFAULT)
+        )
         cost = (tokens_in * price_in + tokens_out * price_out) / 1_000_000
         if self.spent + cost > self.max_usd:
             raise RuntimeError(f"Run budget exceeded: ${self.spent + cost:.4f} > ${self.max_usd:.4f}")
@@ -154,4 +159,3 @@ class TokenBudget:
             raise RuntimeError(f"Tool quota exceeded for {tool_name!r}: maximum {limit}")
         self.tool_calls[tool_name] = used + 1
         return used + 1
-

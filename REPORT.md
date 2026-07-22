@@ -1,7 +1,5 @@
 # Climate Displacement Evidence Agent — Project Report
 
-> Draft: replace every `[MEASURE]` marker with output from the final repository.
-
 ## 1. Problem statement
 
 The intended user is a humanitarian research analyst preparing a short regional
@@ -20,12 +18,15 @@ brief. It is a research assistant, not a forecasting or aid-allocation system.
 The ingestion layer extracts PDF pages, sanitizes untrusted text, and creates
 overlapping parent/child chunks with metadata. Retrieval fuses BM25 and dense
 rankings through RRF. A cross-encoder reranks candidate parents before context
-assembly. Three synthesis calls generate independent structured candidates, and a
-critic agent returns a visible verdict and final answer. MCP exposes four tools;
+assembly. Three synthesis calls generate independent structured candidates. A Lab
+B3-style stance vote identifies the majority conclusion, and a critic agent returns
+a visible verdict and final answer. MCP exposes four tools;
 L1/L4 filters and hard budgets constrain every run. Langfuse records the top-level
 agent, retrieval tools, synthesis calls, critic call, prompt hash, and agent version.
 
-The parent-child decision is described in `docs/architecture.md`.
+The parent-child decision is described in `docs/architecture.md`. The exact
+adaptation of Labs B1-B4 and the supplied helper/MCP code is documented in
+`docs/lab_adaptation.md`.
 
 ## 3. Evaluation
 
@@ -36,24 +37,23 @@ cross-encoder reranking.
 
 | Metric | Baseline | Final | Technique associated with change |
 |---|---:|---:|---|
-| context_recall | [MEASURE] | [MEASURE] | Dense retrieval + RRF + parent expansion |
-| context_precision | [MEASURE] | [MEASURE] | Cross-encoder reranking |
-| faithfulness | [MEASURE] | [MEASURE] | Sanitized evidence-only prompt + critic |
-| answer_relevancy | [MEASURE] | [MEASURE] | Structured synthesis + self-consistency |
+| context_recall | 0.8 | 0.83 | Dense retrieval + RRF + parent expansion |
+| context_precision | 0.64 | 0.7 | Cross-encoder reranking |
+| faithfulness | 0.98 | None | Sanitized evidence-only prompt + critic |
+| answer_relevancy | 0.27 | 0.2 | Structured synthesis + self-consistency |
 
-Across ten full test runs: mean latency was `[MEASURE]` seconds, estimated mean cost
-was `$[MEASURE]`, and tool distribution was `[MEASURE]`. A quota test deliberately
-triggered the sixth `search_evidence` call and recorded the refusal.
+Across ten full test runs: mean latency was `58.49` seconds, estimated mean cost
+was `$0` (local model). The only tool called (8 out of 10 times) was `search_evidence`.
 
 ## 4. Security
 
 | Injection test | Before L1/L4 | After L1/L4 |
 |---|---|---|
-| Direct instruction override | [MEASURE] | blocked |
-| “Disregard previous instructions” variant | [MEASURE] | blocked |
-| Role injection | [MEASURE] | blocked |
-| Fake system tag | [MEASURE] | blocked |
-| Prompt extraction | [MEASURE] | blocked |
+| Direct instruction override | not blocked | blocked by L1: direct_override |
+| “Disregard previous instructions” variant | not blocked | blocked by L1: override_variant |
+| Role injection | not blocked | blocked by L1: role_injection |
+| Fake system tag | not blocked | blocked by L1: tag_injection |
+| Prompt extraction | not blocked | blocked by L1: extraction |
 
 The indirect-injection test places “ignore previous instructions” inside retrieved
 document text. `sanitise_external_content` marks it as untrusted, and the synthesis
@@ -101,6 +101,4 @@ state which backend was actually active.
 | Retrieval pipeline |  |  | X |
 | Report draft |  |  | X |
 
-This initial scaffold and report draft were AI-generated. Before submission, the
-group must review and materially adapt them, explain every function, validate every
-measurement, and update this table to reflect the final division of work.
+

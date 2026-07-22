@@ -1,5 +1,10 @@
 # Climate Displacement Evidence Agent
 
+This homework directly adapts Labs B1–B4 and the supplied `llm_helpers.py` /
+`mcp_server.py` patterns. See [`docs/lab_adaptation.md`](docs/lab_adaptation.md) for
+the cell-level mapping from course code to production code. A compatible subset of
+`llm_helpers.py` is included so the repository also runs outside the lab folder.
+
 An evidence-first research agent for humanitarian analysts comparing disaster
 displacement risks and policy responses. It retrieves from a fixed corpus of
 authoritative reports, produces a cited regional brief, runs self-consistency
@@ -11,7 +16,7 @@ eligibility, or automate aid-allocation decisions.
 ## Quick start
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/IThioye/climate-displacement-agent.git
 cd climate-displacement-agent
 cp .env.example .env
 pip install -r requirements.txt
@@ -45,14 +50,34 @@ blocked/failed outcomes, average latency and cost, tool and publisher distributi
 recent runs, detailed event logs, and a raw JSON export. Logs are stored locally in
 `data/processed/agent_runs.db` and are excluded from Git.
 
-## What was adapted from the course labs
+## Langfuse traces
 
-- Lab B1: parent-child chunking, BM25 + dense retrieval, reciprocal-rank fusion,
-  cross-encoder reranking, metadata filtering, and baseline/final evaluation.
-- Lab B2: Unicode-normalized L1 filtering, sanitization of untrusted document/tool
-  text, the L4 action matrix, token-cost caps, and per-tool quotas.
-- Production lab: prompt hashing, latency/cost/tool measurements, Langfuse spans,
-  and a visible critic verdict.
+Langfuse is separate from the Flask administration page. Configure the three
+values from the Langfuse project settings in `.env`:
+
+```env
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+```
+
+Then run the agent normally through Flask or the CLI. No separate Langfuse function
+needs to be called:
+
+```bash
+python app.py
+# ask a question at http://127.0.0.1:5000
+
+# or run one short-lived CLI trace (the CLI flushes before exit)
+python src/agent.py "What does the evidence say about flood displacement in Bangladesh?"
+```
+
+Open the Langfuse project and select **Tracing**. One run contains the root agent
+observation, retrieval tool, self-consistency chain, three synthesis generations,
+and one critic generation. Set `LANGFUSE_DEBUG=True` temporarily if traces do not
+appear. The implementation is in `src/observability.py`, `src/agent.py`,
+`src/reasoning.py`, and `src/mcp_server.py`.
+
 
 ## Architecture
 
@@ -60,11 +85,14 @@ recent runs, detailed event logs, and a raw JSON export. Logs are stored locally
 2. `src/ingest.py` extracts and sanitizes every page, then creates parent/child chunks.
 3. `src/retrieval.py` fuses BM25 and dense rankings with RRF, resolves child hits to
    parent context, and applies a cross-encoder before returning cited evidence.
-4. `src/agent.py` applies L1/L4/budget checks, retrieves evidence, creates three
-   structured syntheses, and asks a critic agent to select or correct the answer.
+4. `src/agent.py` applies L1/L4/budget checks through the course tool-registry
+   pattern, retrieves evidence, creates three structured syntheses, takes a Lab B3
+   stance majority, and asks a critic agent to verify or correct the answer.
 5. `src/mcp_server.py` exposes four documented, error-safe tools over MCP.
 
 See [docs/architecture.md](docs/architecture.md) for the diagram and trust boundaries.
+For an oral explanation of every main component, see
+[docs/function_guide.md](docs/function_guide.md).
 
 ## MCP server
 

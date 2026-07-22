@@ -5,8 +5,10 @@ flowchart LR
     U[Humanitarian analyst] --> L1[L1 input filter]
     L1 --> A[Agent controller]
     A --> L4[L4 action gate + budgets]
-    L4 --> T[MCP retrieval tools]
+    L4 --> T[Lab ToolRegistry]
     T --> R[BM25 + dense + RRF]
+    M[MCP clients] --> F[FastMCP tools]
+    F --> L4
     R --> X[Cross-encoder reranker]
     X --> C[Sanitized parent context]
     C --> S[3 synthesis calls]
@@ -14,6 +16,7 @@ flowchart LR
     K --> O[Cited briefing + confidence]
     A -. spans .-> LF[Langfuse]
     T -. spans .-> LF
+    F -. spans .-> LF
     S -. spans .-> LF
 ```
 
@@ -33,4 +36,3 @@ larger parent block. Small children make specific figures easier to retrieve; la
 parents preserve definitions, caveats, and the distinction between observed counts
 and modelled risk. The cost is more context per answer, controlled by a four-parent
 limit and the token budget.
-

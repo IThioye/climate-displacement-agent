@@ -1,4 +1,4 @@
-"""MCP server exposing sanitized climate-displacement RAG tools."""
+"""Climate adaptation of the course FastMCP server, with four guarded RAG tools."""
 
 from __future__ import annotations
 
@@ -8,18 +8,12 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 try:
-    from langfuse.decorators import observe
-except ImportError:
-    def observe(*_args, **_kwargs):
-        def decorator(function):
-            return function
-        return decorator
-
-try:
     from .guardrails import Verdict, l1_filter, l4_gate, sanitise_external_content
+    from .observability import observe
     from .retrieval import ClimateRAG
 except ImportError:
     from guardrails import Verdict, l1_filter, l4_gate, sanitise_external_content
+    from observability import observe
     from retrieval import ClimateRAG
 
 
@@ -43,7 +37,7 @@ def safe_query(query: str) -> str:
 
 
 @mcp.tool()
-@observe(name="tool_search_evidence")
+@observe(name="tool_search_evidence", as_type="tool")
 def search_evidence(query: str, region: str = "", country: str = "", k: int = 4) -> str:
     """Search the sanitized report corpus with hybrid retrieval and reranking.
 
@@ -64,7 +58,7 @@ def search_evidence(query: str, region: str = "", country: str = "", k: int = 4)
 
 
 @mcp.tool()
-@observe(name="tool_compare_regions")
+@observe(name="tool_compare_regions", as_type="tool")
 def compare_regions(query: str, regions: list[str], k_per_region: int = 2) -> str:
     """Retrieve comparable evidence separately for multiple regions.
 
@@ -90,7 +84,7 @@ def compare_regions(query: str, regions: list[str], k_per_region: int = 2) -> st
 
 
 @mcp.tool()
-@observe(name="tool_get_source")
+@observe(name="tool_get_source", as_type="tool")
 def get_source(source_id: str) -> str:
     """Return provenance metadata for one indexed report.
 
@@ -111,7 +105,7 @@ def get_source(source_id: str) -> str:
 
 
 @mcp.tool()
-@observe(name="tool_store_finding")
+@observe(name="tool_store_finding", as_type="tool")
 def store_finding(finding: str, source_id: str) -> str:
     """Store a human-verified finding in a local audit file.
 
@@ -138,4 +132,3 @@ def store_finding(finding: str, source_id: str) -> str:
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
-

@@ -1,4 +1,4 @@
-"""Flask interface for running and observing the evidence agent."""
+"""Lab B4 production monitor adapted as a persistent Flask/SQLite interface."""
 
 from __future__ import annotations
 

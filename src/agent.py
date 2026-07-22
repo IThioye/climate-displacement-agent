@@ -4,29 +4,30 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
+import sys
 import threading
 import time
+from pathlib import Path
 from typing import Callable
 
-try:
-    from langfuse.decorators import langfuse_context, observe
-except ImportError:
-    def observe(*_args, **_kwargs):
-        def decorator(function):
-            return function
-        return decorator
-
-    class _NoOpContext:
-        def update_current_trace(self, **_kwargs):
-            return None
-    langfuse_context = _NoOpContext()
+# Reuse Lab B1/B2's ToolRegistry and tool-schema contract for in-process tool
+# execution. The same domain operations are separately exposed over MCP.
+COURSE_ROOT = Path(__file__).resolve().parents[2]
+if str(COURSE_ROOT) not in sys.path:
+    sys.path.insert(0, str(COURSE_ROOT))
+from llm_helpers import ToolRegistry, tool_schema
 
 try:
     from .guardrails import TokenBudget, Verdict, l1_filter, l4_gate
+    from .observability import flush as flush_langfuse
+    from .observability import observe, update_current_span
     from .reasoning import SYSTEM_PROMPT, self_consistent_answer
     from .retrieval import ClimateRAG
 except ImportError:
     from guardrails import TokenBudget, Verdict, l1_filter, l4_gate
+    from observability import flush as flush_langfuse
+    from observability import observe, update_current_span
     from reasoning import SYSTEM_PROMPT, self_consistent_answer
     from retrieval import ClimateRAG
 
@@ -75,7 +76,7 @@ def get_rag(event_callback: ProgressCallback | None = None) -> ClimateRAG:
     return _RAG_INSTANCE
 
 
-@observe(name="tool_search_evidence")
+@observe(name="tool_search_evidence", as_type="tool")
 def _search_evidence(
     rag: ClimateRAG,
     query: str,
@@ -86,7 +87,30 @@ def _search_evidence(
     return rag.search(query, k=4, region=region, country=country)
 
 
-@observe(name="climate_displacement_agent")
+def build_tool_registry(rag: ClimateRAG) -> ToolRegistry:
+    """Adapt the shared Lab registry to the climate-displacement search tool."""
+    registry = ToolRegistry()
+
+    def search_evidence(query: str, region: str = "", country: str = "") -> str:
+        return json.dumps(_search_evidence(rag, query, region, country), ensure_ascii=False)
+
+    registry.register(
+        tool_schema(
+            "search_evidence",
+            "Search approved climate-displacement reports before answering factual questions.",
+            {
+                "query": {"type": "string", "description": "Evidence question"},
+                "region": {"type": "string", "description": "Optional region"},
+                "country": {"type": "string", "description": "Optional country"},
+            },
+            ["query"],
+        ),
+        search_evidence,
+    )
+    return registry
+
+
+@observe(name="climate_displacement_agent", as_type="agent")
 def run(
     question: str,
     region: str = "",
@@ -94,6 +118,10 @@ def run(
     event_callback: ProgressCallback | None = None,
 ) -> dict:
     started = time.perf_counter()
+    update_current_span(
+        version=AGENT_VERSION,
+        metadata={"prompt_hash": PROMPT_HASH, "component": "agent"},
+    )
     _emit(
         event_callback, "request",
         "Your question was received.",
@@ -143,7 +171,14 @@ def run(
         "Searching trusted reports for relevant evidence.",
         f"Executing BM25+dense retrieval and RRF fusion; metadata filters={filters}.",
     )
-    evidence = _search_evidence(rag, value, region, country)
+    registry = build_tool_registry(rag)
+    raw_evidence = registry.call(
+        "search_evidence", {"query": value, "region": region, "country": country}
+    )
+    try:
+        evidence = json.loads(raw_evidence)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"The Lab tool registry returned invalid evidence JSON: {raw_evidence}") from exc
     if not evidence:
         _emit(
             event_callback, "retrieval",
@@ -178,8 +213,7 @@ def run(
         }
         for position, item in enumerate(evidence, start=1)
     ]
-    langfuse_context.update_current_trace(
-        name="climate-displacement-brief",
+    update_current_span(
         version=AGENT_VERSION,
         metadata={"prompt_hash": PROMPT_HASH, "latency_s": elapsed, "cost_usd": budget.spent},
     )
@@ -221,6 +255,7 @@ def main() -> None:
     if result.get("metrics"):
         print("\n--- RUN METRICS ---")
         print(result["metrics"])
+    flush_langfuse()
 
 
 if __name__ == "__main__":

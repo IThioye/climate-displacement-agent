@@ -18,12 +18,14 @@ import sys
 from datasets import Dataset
 from langchain_core.embeddings import Embeddings
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from dotenv import load_dotenv
 from ragas import evaluate
 from ragas.metrics import answer_relevancy, context_precision, context_recall, faithfulness
 from ragas.run_config import RunConfig
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+load_dotenv(ROOT / ".env")
 
 from src.retrieval import ClimateRAG
 
@@ -52,7 +54,7 @@ class LocalHashEmbeddings(Embeddings):
 
 def judge_components():
     provider = os.getenv("LLM_PROVIDER", "ollama").lower()
-    model = os.getenv("LLM_MODEL", "gemma4:e4b")
+    model = os.getenv("LLM_MODEL", "gemma3:4b")
     if provider == "ollama":
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
         api_key = os.getenv("OLLAMA_API_KEY", "ollama")

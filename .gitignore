@@ -5,3 +5,6 @@ __pycache__/
 data/processed/verified_findings.jsonl
 data/processed/agent_runs.db
 data/processed/agent_runs.db-journal
+docs/requirements_checklist.md
+docs/lab_adaptation.md
+docs/function_guide.md
