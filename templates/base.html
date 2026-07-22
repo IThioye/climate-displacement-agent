@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Climate Displacement Agent{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('index') }}">Climate Displacement Evidence Agent</a>
+    <nav>
+      <a href="{{ url_for('index') }}">Agent</a>
+      <a href="{{ url_for('admin') }}">Administration</a>
+    </nav>
+  </header>
+  <main class="page-shell">
+    {% block content %}{% endblock %}
+  </main>
+  <footer>
+    AI-generated research assistance. Verify every claim against the cited report.
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
+

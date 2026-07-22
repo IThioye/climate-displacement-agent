@@ -1,0 +1,52 @@
+[
+  {
+    "question": "How many people were living in internal displacement at the end of 2024?",
+    "ground_truth": "83.4 million people",
+    "source_id": "idmc_grid_2025_summary"
+  },
+  {
+    "question": "How many disaster displacements were recorded worldwide in 2024?",
+    "ground_truth": "45.8 million disaster displacements",
+    "source_id": "idmc_grid_2025_summary"
+  },
+  {
+    "question": "How many disaster displacements did the Philippines record in 2024?",
+    "ground_truth": "8.996 million",
+    "source_id": "idmc_grid_2025_summary"
+  },
+  {
+    "question": "How many disaster displacements did Bangladesh record in 2024?",
+    "ground_truth": "2.402 million",
+    "source_id": "idmc_grid_2025_summary"
+  },
+  {
+    "question": "Which divisions of Bangladesh are most at risk of disaster displacement?",
+    "ground_truth": "Sylhet, Dhaka, Chittagong, Khulna and Barisal",
+    "source_id": "idmc_bangladesh_risk_2026"
+  },
+  {
+    "question": "How many disaster displacements did Bangladesh record between 2008 and 2024?",
+    "ground_truth": "more than 21 million",
+    "source_id": "idmc_bangladesh_risk_2026"
+  },
+  {
+    "question": "What hazards drive the highest annual displacement risk in Bangladesh?",
+    "ground_truth": "riverine floods and storm surges",
+    "source_id": "idmc_bangladesh_risk_2026"
+  },
+  {
+    "question": "What does the World Bank Groundswell report model for 2050?",
+    "ground_truth": "internal climate migration under alternative development and climate scenarios",
+    "source_id": "world_bank_groundswell"
+  },
+  {
+    "question": "What is the definition of an internally displaced person who has not crossed a state border?",
+    "ground_truth": "a person forced or obliged to leave their home who has not crossed an internationally recognized state border",
+    "source_id": "unhcr_climate_mobility_2009"
+  },
+  {
+    "question": "Which Asia-Pacific countries are discussed as exposed to climate-related migration?",
+    "ground_truth": "Bangladesh, the Philippines and Viet Nam among others",
+    "source_id": "adb_climate_migration_asia"
+  }
+]

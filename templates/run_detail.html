@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Run {{ run.id[:8] }}{% endblock %}
+{% block content %}
+<section class="hero compact">
+  <p class="eyebrow">Run inspection</p>
+  <h1>{{ run.id[:12] }}</h1>
+  <p>{{ run.created_at }} · {{ run.status }} · {{ run.outcome or 'no outcome' }}</p>
+</section>
+
+<section class="panel">
+  <h2>Question</h2><pre class="answer">{{ run.question }}</pre>
+  <p><strong>Filters:</strong> region={{ run.region or 'none' }}, country={{ run.country or 'none' }}</p>
+</section>
+
+<section class="admin-grid">
+  <article class="panel"><h2>Answer</h2><pre class="answer">{{ run.answer or 'No answer' }}</pre></article>
+  <article class="panel"><h2>Critic</h2><pre class="critic">{{ run.critic or 'Not run' }}</pre></article>
+</section>
+
+<section class="panel">
+  <h2>Operational events</h2>
+  <ol class="event-list">
+  {% for event in run.events %}
+    <li><span class="event-stage">{{ event.stage }}</span><span>{{ event.admin_message or event.message }}</span></li>
+  {% else %}<li>No events recorded.</li>{% endfor %}
+  </ol>
+</section>
+
+<section class="admin-grid">
+  <article class="panel">
+    <h2>Metrics</h2><dl class="metric-list">
+    {% for key, value in run.metrics.items() %}<dt>{{ key }}</dt><dd>{{ value }}</dd>{% endfor %}
+    </dl>
+  </article>
+  <article class="panel">
+    <h2>Sources</h2><ul class="source-list">
+    {% for source in run.sources %}
+      <li><a href="{{ source.url }}" target="_blank" rel="noopener">{{ source.publisher }} ({{ source.year }}), p.{{ source.page }}</a></li>
+    {% else %}<li>No sources.</li>{% endfor %}
+    </ul>
+  </article>
+</section>
+{% endblock %}

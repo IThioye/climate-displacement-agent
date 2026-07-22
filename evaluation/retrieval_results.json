@@ -1,0 +1,17 @@
+{
+  "date": "2026-07-22",
+  "questions": 10,
+  "backend": {
+    "dense": "sentence-transformers/all-MiniLM-L6-v2",
+    "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  },
+  "baseline_tfidf": {
+    "hit_at_4": 1.0,
+    "mrr": 0.9
+  },
+  "final_hybrid_parent_reranked": {
+    "hit_at_4": 1.0,
+    "mrr": 0.933
+  },
+  "note": "Retrieval proxy only. The four RAGAS generation metrics still need to be measured and added to REPORT.md."
+}

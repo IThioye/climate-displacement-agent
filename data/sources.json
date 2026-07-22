@@ -1,0 +1,64 @@
+{
+  "sources": [
+    {
+      "id": "idmc_grid_2025_summary",
+      "file": "idmc_grid_2025_summary.pdf",
+      "title": "Global Report on Internal Displacement 2025 - Summary",
+      "publisher": "IDMC",
+      "year": 2025,
+      "region": "Global",
+      "country": "Global",
+      "url": "https://api.internal-displacement.org/sites/default/files/publications/documents/250506_IDMC_Global_Report_Internal_Displacement_2025_Summary_ENG.pdf"
+    },
+    {
+      "id": "idmc_bangladesh_risk_2026",
+      "file": "idmc_bangladesh_risk_2026.pdf",
+      "title": "Bangladesh: Disaster Displacement Risk Profile",
+      "publisher": "IDMC",
+      "year": 2026,
+      "region": "South Asia",
+      "country": "Bangladesh",
+      "url": "https://api.internal-displacement.org/sites/default/files/2026-02/2026-idmc-bangladesh-displacement-risk-short%20profile.pdf"
+    },
+    {
+      "id": "world_bank_groundswell",
+      "file": "world_bank_groundswell_policy_note.pdf",
+      "title": "Groundswell: Preparing for Internal Climate Migration",
+      "publisher": "World Bank",
+      "year": 2018,
+      "region": "Global",
+      "country": "Global",
+      "url": "https://documents1.worldbank.org/curated/en/846391522306665751/pdf/124719-v2-PUB-PUBLIC-docdate-3-18-18WBG-ClimateChange-Final.pdf"
+    },
+    {
+      "id": "iom_environment_climate_dialogue_2021",
+      "file": "iom_environment_climate_dialogue_2021.pdf",
+      "title": "Accelerating Integrated Action on Sustainable Development: Migration, the Environment and Climate Change",
+      "publisher": "IOM",
+      "year": 2021,
+      "region": "Asia-Pacific",
+      "country": "Regional",
+      "url": "https://environmentalmigration.iom.int/sites/g/files/tmzbdl1411/files/documents/Report%20IDM%2025-27%20May%202021.pdf"
+    },
+    {
+      "id": "unhcr_climate_mobility_2009",
+      "file": "unhcr_climate_migration_displacement_2009.pdf",
+      "title": "Climate Change, Migration and Displacement: Who Will Be Affected?",
+      "publisher": "UNHCR and partner agencies",
+      "year": 2009,
+      "region": "Global",
+      "country": "Global",
+      "url": "https://www.unhcr.org/sites/default/files/legacy-pdf/4a1e4fb42.pdf"
+    },
+    {
+      "id": "adb_climate_migration_asia",
+      "file": "adb_climate_migration_asia.pdf",
+      "title": "Addressing Climate Change and Migration in Asia and the Pacific",
+      "publisher": "Asian Development Bank",
+      "year": 2012,
+      "region": "Asia-Pacific",
+      "country": "Regional",
+      "url": "https://www.adb.org/sites/default/files/publication/29662/addressing-climate-change-migration.pdf"
+    }
+  ]
+}

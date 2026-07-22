@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Climate evidence chat{% endblock %}
+{% block content %}
+<div class="chat-layout">
+  <aside class="prompt-sidebar" aria-label="Suggested questions">
+    <div class="sidebar-heading">
+      <span class="agent-mark small" aria-hidden="true">C</span>
+      <div><strong>Questions to test</strong><small>{{ questions|length }} prepared prompts</small></div>
+    </div>
+    <div class="prompt-list">
+      {% for item in questions %}
+      <button class="prompt-item" type="button" data-question="{{ item.question }}">
+        <span>{{ item.category }}</span>{{ item.question }}
+      </button>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <section class="chat-main">
+    <div id="conversation" class="conversation" aria-live="polite">
+      <div id="welcome" class="chat-welcome">
+        <span class="agent-mark" aria-hidden="true">C</span>
+        <h1>How can I help?</h1>
+        <p>Ask about climate displacement. Answers are grounded in the report library and linked to exact sources.</p>
+        <div class="starter-grid">
+          {% for item in questions[:4] %}
+          <button class="starter-card" type="button" data-question="{{ item.question }}">
+            {{ item.question }}<small>{{ item.category }}</small>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <form id="agent-form" class="composer">
+        <label class="sr-only" for="question">Message the climate evidence agent</label>
+        <textarea id="question" name="question" rows="1" maxlength="8000"
+          placeholder="Message the climate evidence agent" required></textarea>
+        <button id="submit-button" class="send-button" type="submit" aria-label="Send question" title="Send">
+          <span aria-hidden="true">&#8593;</span>
+        </button>
+      </form>
+      <p class="composer-note">AI-generated research assistance. Check the numbered sources.</p>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const form = document.getElementById('agent-form');
+const questionInput = document.getElementById('question');
+const conversation = document.getElementById('conversation');
+const welcome = document.getElementById('welcome');
+const submitButton = document.getElementById('submit-button');
+let pollTimer = null;
+let turnNumber = 0;
+const stageLabels = {
+  queue: 'Waiting to start', request: 'Reading your question', security: 'Running safety checks',
+  retrieval: 'Searching trusted reports', sanitization: 'Checking retrieved content',
+  synthesis: 'Drafting an evidence-based answer', critic: 'Reviewing accuracy and citations',
+  complete: 'Answer ready', error: 'Could not complete', interface: 'Connection problem'
+};
+
+function scrollToLatest() {
+  requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'}));
+}
+
+function addUserMessage(question) {
+  const row = document.createElement('article');
+  row.className = 'message-row user-row';
+  const bubble = document.createElement('div');
+  bubble.className = 'user-message';
+  bubble.textContent = question;
+  row.appendChild(bubble);
+  conversation.appendChild(row);
+}
+
+function addAssistantTurn() {
+  const turnId = `turn-${++turnNumber}`;
+  const row = document.createElement('article');
+  row.className = 'message-row assistant-row';
+  row.innerHTML = `
+    <div class="agent-mark message-mark" aria-hidden="true">C</div>
+    <div class="assistant-content">
+      <details class="thinking" open>
+        <summary><span class="thinking-spinner" aria-hidden="true"></span><span class="thinking-label">Starting</span><span class="chevron" aria-hidden="true">&#8964;</span></summary>
+        <ol class="thinking-events"></ol>
+      </details>
+      <div class="answer-content hidden"></div>
+      <section class="citations hidden"><h3>Sources</h3><ol class="source-cards"></ol></section>
+      <details class="quality-review hidden"><summary>Quality review</summary><p></p></details>
+    </div>`;
+  conversation.appendChild(row);
+  return {
+    id: turnId,
+    row,
+    thinking: row.querySelector('.thinking'),
+    label: row.querySelector('.thinking-label'),
+    spinner: row.querySelector('.thinking-spinner'),
+    events: row.querySelector('.thinking-events'),
+    answer: row.querySelector('.answer-content'),
+    citations: row.querySelector('.citations'),
+    sources: row.querySelector('.source-cards'),
+    quality: row.querySelector('.quality-review')
+  };
+}
+
+function updateProgress(turn, event) {
+  const label = stageLabels[event.stage] || 'Working';
+  turn.label.textContent = label;
+  let item = turn.events.querySelector(`[data-stage="${event.stage}"]`);
+  if (!item) {
+    item = document.createElement('li');
+    item.dataset.stage = event.stage;
+    turn.events.appendChild(item);
+  }
+  item.textContent = event.message;
+  item.classList.add('current');
+  [...turn.events.children].filter(node => node !== item).forEach(node => node.classList.remove('current'));
+  scrollToLatest();
+}
+
+function appendTextWithCitations(container, text, turnId, sourceCount) {
+  const citationPattern = /\[(?:E)?(\d+)\]/gi;
+  let cursor = 0;
+  for (const match of text.matchAll(citationPattern)) {
+    container.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+    const number = Number(match[1]);
+    if (number >= 1 && number <= sourceCount) {
+      const link = document.createElement('a');
+      link.className = 'inline-citation';
+      link.href = `#${turnId}-source-${number}`;
+      link.textContent = number;
+      link.title = `Open source ${number}`;
+      container.appendChild(link);
+    } else {
+      container.appendChild(document.createTextNode(match[0]));
+    }
+    cursor = match.index + match[0].length;
+  }
+  container.appendChild(document.createTextNode(text.slice(cursor)));
+}
+
+function renderAnswer(turn, answer, sourceCount) {
+  turn.answer.replaceChildren();
+  const headingPattern = /^(EVIDENCE|ANALYSIS|CONCLUSION|CONFIDENCE):\s*(.*)$/i;
+  String(answer || 'No answer returned.').split(/\n+/).forEach(line => {
+    if (!line.trim()) return;
+    const match = line.trim().match(headingPattern);
+    if (match) {
+      const section = document.createElement('section');
+      section.className = 'answer-section';
+      const heading = document.createElement('h3');
+      heading.textContent = match[1][0].toUpperCase() + match[1].slice(1).toLowerCase();
+      const paragraph = document.createElement('p');
+      appendTextWithCitations(paragraph, match[2], turn.id, sourceCount);
+      section.append(heading, paragraph);
+      turn.answer.appendChild(section);
+    } else {
+      const paragraph = document.createElement('p');
+      appendTextWithCitations(paragraph, line, turn.id, sourceCount);
+      turn.answer.appendChild(paragraph);
+    }
+  });
+  turn.answer.classList.remove('hidden');
+}
+
+function showResult(turn, result) {
+  const sourceItems = result.sources || [];
+  renderAnswer(turn, result.answer, sourceItems.length);
+  turn.sources.replaceChildren();
+  sourceItems.forEach((source, index) => {
+    const number = source.citation || index + 1;
+    const item = document.createElement('li');
+    item.id = `${turn.id}-source-${number}`;
+    const link = document.createElement('a');
+    link.href = source.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    const title = document.createElement('strong');
+    title.textContent = source.title || `${source.publisher} report`;
+    const details = document.createElement('span');
+    details.textContent = `${source.publisher} · ${source.year} · page ${source.page}`;
+    link.append(title, details);
+    item.appendChild(link);
+    turn.sources.appendChild(item);
+  });
+  if (sourceItems.length) turn.citations.classList.remove('hidden');
+
+  const critic = result.critic || '';
+  const verdict = critic.match(/^VERDICT:\s*(.+)$/mi)?.[1];
+  const reason = critic.match(/^REASON:\s*(.+)$/mi)?.[1];
+  turn.quality.querySelector('p').textContent = verdict
+    ? `${verdict.toUpperCase() === 'PASS' ? 'Passed' : 'Needs revision'}${reason ? ` — ${reason}` : ''}`
+    : (critic === 'not run' ? 'The quality review was not required.' : 'The review completed.');
+  turn.quality.classList.remove('hidden');
+  turn.label.textContent = result.outcome === 'blocked' ? 'Stopped by safety checks' : 'Completed';
+  turn.spinner.classList.add(result.outcome === 'blocked' ? 'stopped' : 'done');
+  turn.thinking.open = false;
+  scrollToLatest();
+}
+
+async function poll(runId, turn) {
+  try {
+    const response = await fetch(`/api/runs/${runId}`, {cache: 'no-store'});
+    if (!response.ok) throw new Error(`Status request failed (${response.status})`);
+    const job = await response.json();
+    (job.events || []).slice(turn.displayedEvents || 0).forEach(event => updateProgress(turn, event));
+    turn.displayedEvents = (job.events || []).length;
+    if (job.status === 'completed') {
+      clearInterval(pollTimer);
+      turn.finished = true;
+      showResult(turn, job.result || {});
+      submitButton.disabled = false;
+      questionInput.focus();
+    } else if (job.status === 'failed') {
+      clearInterval(pollTimer);
+      turn.finished = true;
+      updateProgress(turn, {stage: 'error', message: job.error || 'The request failed safely.'});
+      turn.spinner.classList.add('stopped');
+      submitButton.disabled = false;
+    }
+  } catch (error) {
+    clearInterval(pollTimer);
+    turn.finished = true;
+    updateProgress(turn, {stage: 'interface', message: error.message});
+    turn.spinner.classList.add('stopped');
+    submitButton.disabled = false;
+  }
+}
+
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const question = questionInput.value.trim();
+  if (!question || submitButton.disabled) return;
+  clearInterval(pollTimer);
+  welcome?.classList.add('hidden');
+  addUserMessage(question);
+  const turn = addAssistantTurn();
+  questionInput.value = '';
+  questionInput.style.height = 'auto';
+  submitButton.disabled = true;
+  scrollToLatest();
+  try {
+    const response = await fetch('/api/runs', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not start the request.');
+    await poll(data.run_id, turn);
+    if (!turn.finished) pollTimer = setInterval(() => poll(data.run_id, turn), 750);
+  } catch (error) {
+    turn.finished = true;
+    updateProgress(turn, {stage: 'interface', message: error.message});
+    turn.spinner.classList.add('stopped');
+    submitButton.disabled = false;
+  }
+});
+
+questionInput.addEventListener('input', () => {
+  questionInput.style.height = 'auto';
+  questionInput.style.height = `${Math.min(questionInput.scrollHeight, 180)}px`;
+});
+questionInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    form.requestSubmit();
+  }
+});
+document.querySelectorAll('[data-question]').forEach(button => {
+  button.addEventListener('click', () => {
+    questionInput.value = button.dataset.question;
+    questionInput.dispatchEvent(new Event('input'));
+    questionInput.focus();
+  });
+});
+</script>
+{% endblock %}

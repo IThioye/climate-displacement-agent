@@ -1,0 +1,7 @@
+.env
+__pycache__/
+.pytest_cache/
+*.pyc
+data/processed/verified_findings.jsonl
+data/processed/agent_runs.db
+data/processed/agent_runs.db-journal

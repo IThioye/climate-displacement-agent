@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Administration{% endblock %}
+{% block content %}
+<section class="hero compact">
+  <p class="eyebrow">Local administration</p>
+  <h1>Analysis and logging</h1>
+  <p>Operational measurements and persisted run history. Questions may contain user-provided text.</p>
+</section>
+
+<section class="stats-grid">
+  <article class="stat"><span>Total runs</span><strong>{{ summary.total or 0 }}</strong></article>
+  <article class="stat"><span>Completed</span><strong>{{ summary.completed or 0 }}</strong></article>
+  <article class="stat"><span>Blocked</span><strong>{{ summary.blocked or 0 }}</strong></article>
+  <article class="stat"><span>Failed</span><strong>{{ summary.failed or 0 }}</strong></article>
+  <article class="stat"><span>Average latency</span><strong>{{ "%.2f"|format(avg_latency) }} s</strong></article>
+  <article class="stat"><span>Average estimated cost</span><strong>${{ "%.5f"|format(avg_cost) }}</strong></article>
+</section>
+
+<section class="admin-grid">
+  <article class="panel">
+    <p class="eyebrow">Tool distribution</p>
+    <h2>Recorded calls</h2>
+    {% if tool_totals %}
+      <dl class="metric-list">
+      {% for tool, count in tool_totals.items() %}<dt>{{ tool }}</dt><dd>{{ count }}</dd>{% endfor %}
+      </dl>
+    {% else %}<p class="muted">No completed tool calls yet.</p>{% endif %}
+  </article>
+  <article class="panel">
+    <p class="eyebrow">Evidence distribution</p>
+    <h2>Cited publishers</h2>
+    {% if publisher_totals %}
+      <dl class="metric-list">
+      {% for publisher, count in publisher_totals.items() %}<dt>{{ publisher }}</dt><dd>{{ count }}</dd>{% endfor %}
+      </dl>
+    {% else %}<p class="muted">No cited evidence yet.</p>{% endif %}
+  </article>
+</section>
+
+<section class="panel table-panel">
+  <div class="section-heading">
+    <div><p class="eyebrow">SQLite audit log</p><h2>Recent runs</h2></div>
+    <a class="secondary-button" href="{{ url_for('admin_logs') }}">Raw JSON log</a>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Time</th><th>Question</th><th>Status</th><th>Outcome</th><th>Latency</th><th>Cost</th><th></th></tr></thead>
+      <tbody>
+      {% for run in recent %}
+        <tr>
+          <td>{{ run.created_at }}</td>
+          <td class="question-cell">{{ run.question }}</td>
+          <td><span class="status-pill {{ 'complete' if run.status == 'completed' else 'blocked' if run.status == 'failed' else 'running' }}">{{ run.status }}</span></td>
+          <td>{{ run.outcome or '—' }}</td>
+          <td>{{ run.metrics.get('latency_s', '—') }}</td>
+          <td>{{ run.metrics.get('estimated_cost_usd', '—') }}</td>
+          <td><a href="{{ url_for('admin_run', run_id=run.id) }}">Inspect</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="muted">No runs have been logged.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
