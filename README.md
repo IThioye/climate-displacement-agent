@@ -135,16 +135,13 @@ python evaluation/evaluate_retrieval.py
 python evaluation/evaluate_ragas.py --limit 10
 ```
 
-The evaluation set contains ten questions. Save the baseline and final retrieval
-results before running the RAGAS generation metrics. Do not invent report numbers;
-paste the measurements from your actual runs into `REPORT.md`.
+
 
 ## Data provenance
 
 The starter corpus contains reports from IDMC, IOM, UNHCR/OHCHR, the World Bank,
 and the Asian Development Bank. Each retrieved passage retains publisher, title,
-year, page, region/country, and source URL. Review each publisher's reuse terms
-before making the repository public.
+year, page, region/country, and source URL.
 
 ## Security boundary
 
