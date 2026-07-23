@@ -177,13 +177,13 @@ baseline and final answers.
 | B | MCP server | 10 | **9** 
 | C | Security stack | 10 | **10** 
 | D | Reasoning strategy | 10 | **10** 
-| E | Observability | 5 | **2** 
-| F | RAGAS baseline and improvement | 12 | **8** 
-| G | Cost and latency reporting | 8 | **4** 
+| E | Observability | 5 | **5** 
+| F | RAGAS baseline and improvement | 12 | **11** 
+| G | Cost and latency reporting | 8 | **7** 
 | H | Problem statement and architecture | 8 | **8** 
 | I | EU AI Act assessment | 6 | **6** 
 | J | Limitations and what is next | 6 | **6** 
 | K | AI disclosure and code ownership | 10 | **8** 
 
 
-## **Final self-assessed score: 85/100.**
+## **Final self-assessed score: 94/100.**
