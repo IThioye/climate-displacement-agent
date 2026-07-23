@@ -1,10 +1,5 @@
 # Climate Displacement Evidence Agent
 
-This homework directly adapts Labs B1–B4 and the supplied `llm_helpers.py` /
-`mcp_server.py` patterns. See [`docs/lab_adaptation.md`](docs/lab_adaptation.md) for
-the cell-level mapping from course code to production code. A compatible subset of
-`llm_helpers.py` is included so the repository also runs outside the lab folder.
-
 An evidence-first research agent for humanitarian analysts comparing disaster
 displacement risks and policy responses. It retrieves from a fixed corpus of
 authoritative reports, produces a cited regional brief, runs self-consistency
@@ -90,9 +85,6 @@ appear. The implementation is in `src/observability.py`, `src/agent.py`,
    stance majority, and asks a critic agent to verify or correct the answer.
 5. `src/mcp_server.py` exposes four documented, error-safe tools over MCP.
 
-See [docs/architecture.md](docs/architecture.md) for the diagram and trust boundaries.
-For an oral explanation of every main component, see
-[docs/function_guide.md](docs/function_guide.md).
 
 ## MCP server
 
