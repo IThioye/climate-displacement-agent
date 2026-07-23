@@ -1,17 +1,17 @@
 {
   "provider": "ollama",
-  "model": "gemma4:e4b",
+  "model": "gemma3:4b",
   "questions": 10,
   "baseline": {
-    "context_recall": 0.8,
-    "context_precision": 0.6416666666074999,
-    "faithfulness": 0.9821428571428572,
-    "answer_relevancy": 0.27434942417455666
+    "context_recall": 0.6,
+    "context_precision": 0.7638888888456481,
+    "faithfulness": 0.95,
+    "answer_relevancy": 0.27852164269385277
   },
   "final": {
-    "context_recall": 0.8333333333333334,
-    "context_precision": 0.6999999999529166,
-    "faithfulness": NaN,
-    "answer_relevancy": 0.19948087171712997
+    "context_recall": 0.84375,
+    "context_precision": 0.9333333332922221,
+    "faithfulness": 0.9739583333333334,
+    "answer_relevancy": 0.17580885205442556
   }
 }
