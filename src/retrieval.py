@@ -14,7 +14,7 @@ import os
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 import numpy as np
 
@@ -100,6 +100,7 @@ class DenseIndex:
     """Sentence-transformer embeddings with a no-network hash fallback."""
 
     def __init__(self, texts: list[str]):
+        self.texts = list(texts)
         self.backend = "hash-fallback"
         self.model = None
         use_models = os.getenv("RAG_USE_LOCAL_MODELS", "1") == "1"
@@ -109,11 +110,30 @@ class DenseIndex:
 
                 self.model = SentenceTransformer(os.getenv(
                     "DENSE_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
-                ))
-                self.backend = "sentence-transformer"
+                ), device=os.getenv("RAG_DEVICE", "cpu"))
+                self.backend = f"sentence-transformer ({os.getenv('RAG_DEVICE', 'cpu')})"
             except Exception as exc:
                 print(f"[WARN] Dense model unavailable; using hash fallback: {exc}")
-        self.vectors = self.encode(texts)
+        try:
+            self.vectors = self.encode(self.texts)
+        except Exception as exc:
+            self._switch_to_fallback(exc)
+
+    def _switch_to_fallback(self, exc: Exception) -> None:
+        """Release a failed accelerator/model and rebuild compatible hash vectors."""
+        print(f"[WARN] Dense encoding failed; using hash fallback: {exc}")
+        self.model = None
+        self.backend = "hash-fallback"
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except (ImportError, RuntimeError):
+            pass
+        self.vectors = np.vstack(
+            [self._hash_vector(text) for text in self.texts]
+        ) if self.texts else np.empty((0, 512))
 
     @staticmethod
     def _hash_vector(text: str, dimensions: int = 512) -> np.ndarray:
@@ -132,7 +152,11 @@ class DenseIndex:
         return np.vstack([self._hash_vector(text) for text in texts]) if texts else np.empty((0, 512))
 
     def scores(self, query: str) -> np.ndarray:
-        query_vector = self.encode([query])[0]
+        try:
+            query_vector = self.encode([query])[0]
+        except Exception as exc:
+            self._switch_to_fallback(exc)
+            query_vector = self._hash_vector(query)
         return self.vectors @ query_vector
 
 
@@ -148,8 +172,8 @@ class Reranker:
 
                 self.model = CrossEncoder(os.getenv(
                     "RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-                ))
-                self.backend = "cross-encoder"
+                ), device=os.getenv("RAG_DEVICE", "cpu"))
+                self.backend = f"cross-encoder ({os.getenv('RAG_DEVICE', 'cpu')})"
             except Exception as exc:
                 print(f"[WARN] Cross-encoder unavailable; using lexical fallback: {exc}")
 
@@ -163,7 +187,22 @@ class Reranker:
 
     def scores(self, query: str, documents: list[str]) -> list[float]:
         if self.model is not None:
-            return [float(value) for value in self.model.predict([(query, doc) for doc in documents])]
+            try:
+                return [
+                    float(value)
+                    for value in self.model.predict([(query, doc) for doc in documents])
+                ]
+            except Exception as exc:
+                print(f"[WARN] Cross-encoder prediction failed; using lexical fallback: {exc}")
+                self.model = None
+                self.backend = "lexical-fallback"
+                try:
+                    import torch
+
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except (ImportError, RuntimeError):
+                    pass
         return [self._fallback_score(query, document) for document in documents]
 
 
@@ -214,14 +253,21 @@ class ClimateRAG:
         query: str,
         k: int = 4,
         candidate_k: int = 30,
+        event_callback: Callable[[str], None] | None = None,
         **filters,
     ) -> list[dict]:
+        def progress(message: str) -> None:
+            if event_callback is not None:
+                event_callback(message)
+
         eligible = self._eligible(filters)
         if not eligible:
             return []
+        progress("Ranking matching passages with keyword and semantic search.")
         bm25_ranking = sorted(eligible, key=lambda i: self.bm25.score(query, i), reverse=True)
         dense_scores = self.dense.scores(query)
         dense_ranking = sorted(eligible, key=lambda i: float(dense_scores[i]), reverse=True)
+        progress("Combining the keyword and semantic rankings.")
         candidates = reciprocal_rank_fusion([
             bm25_ranking[:candidate_k], dense_ranking[:candidate_k]
         ])[:candidate_k]
@@ -233,6 +279,7 @@ class ClimateRAG:
             parents.setdefault(chunk["parent_id"], chunk)
         parent_chunks = list(parents.values())
         parent_texts = [chunk["parent_text"] for chunk in parent_chunks]
+        progress("Reranking the strongest passages before assembling evidence.")
         rerank_scores = self.reranker.scores(query, parent_texts)
         ranked = sorted(
             zip(rerank_scores, parent_chunks), key=lambda item: item[0], reverse=True

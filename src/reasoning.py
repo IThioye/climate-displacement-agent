@@ -14,9 +14,13 @@ from dotenv import load_dotenv
 
 # Labs B1-B4 use this provider-agnostic client. The homework adapts the same
 # interface instead of introducing a second provider implementation.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 COURSE_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) in sys.path:
+    sys.path.remove(str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT))
 if str(COURSE_ROOT) not in sys.path:
-    sys.path.insert(0, str(COURSE_ROOT))
+    sys.path.append(str(COURSE_ROOT))
 from llm_helpers import make_client
 
 try:
@@ -113,7 +117,13 @@ class ModelClient:
     def __init__(self):
         provider = os.getenv("LLM_PROVIDER", "ollama").lower()
         self.provider = provider
-        self.model = os.getenv("LLM_MODEL", "gemma3:4b")
+        provider_defaults = {
+            "ollama": "gemma3:4b",
+            "mistral": "mistral-small-latest",
+            "openai": "gpt-4o-mini",
+            "google": "gemini-2.5-flash",
+        }
+        self.model = os.getenv("LLM_MODEL") or provider_defaults.get(provider, "gemma3:4b")
         self.client = make_client(provider=provider, model=self.model, quiet=True)
 
     @observe(as_type="generation", name="llm_synthesis")

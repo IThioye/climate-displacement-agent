@@ -19,13 +19,18 @@ from dotenv import load_dotenv
 load_dotenv()
 GOOGLE_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 OLLAMA_OPENAI_BASE_URL = "http://localhost:11434/v1"
+MISTRAL_OPENAI_BASE_URL = "https://api.mistral.ai/v1"
 
 
 def credentials_available(provider: str | None = None) -> bool:
     provider = (provider or os.getenv("LLM_PROVIDER", "openai")).lower()
     if provider == "ollama":
         return True
-    return bool(os.getenv({"openai": "OPENAI_API_KEY", "google": "GOOGLE_API_KEY"}.get(provider, "")))
+    return bool(os.getenv({
+        "openai": "OPENAI_API_KEY",
+        "google": "GOOGLE_API_KEY",
+        "mistral": "MISTRAL_API_KEY",
+    }.get(provider, "")))
 
 
 @dataclass
@@ -67,6 +72,11 @@ class LLMClient:
         elif self.provider == "openai":
             self._client = OpenAI(
                 api_key=os.environ["OPENAI_API_KEY"], base_url=os.getenv("OPENAI_BASE_URL")
+            )
+        elif self.provider == "mistral":
+            self._client = OpenAI(
+                api_key=os.environ["MISTRAL_API_KEY"],
+                base_url=os.getenv("MISTRAL_BASE_URL", MISTRAL_OPENAI_BASE_URL),
             )
         else:
             raise ValueError(f"Unsupported provider in vendored Lab helper: {self.provider!r}")

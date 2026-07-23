@@ -20,8 +20,35 @@ python src/ingest.py
 python src/agent.py "Compare flood displacement evidence for Bangladesh and Southeast Asia"
 ```
 
-The first run may download two small Hugging Face models. Set
-`RAG_USE_LOCAL_MODELS=0` for deterministic no-download fallbacks.
+The first run may download two small Hugging Face models. Retrieval runs on CPU
+by default (`RAG_DEVICE=cpu`) so it does not compete with another local model for
+GPU memory. Set `RAG_USE_LOCAL_MODELS=0` for deterministic no-download fallbacks,
+or set `RAG_DEVICE=cuda` only when sufficient dedicated VRAM is available.
+
+The CLI prints the same user-friendly stages as the web interface while it runs:
+request check, safety authorization, evidence search, analysis, critic review, and
+completion.
+
+At completion it prints the cited source list, run metrics, and Langfuse trace ID.
+Add `LANGFUSE_PROJECT_ID` to `.env` if you also want a directly clickable trace
+URL. The tool span records query/filter metadata but deliberately excludes the
+in-memory RAG models and indexes from serialization.
+
+### Hosted Mistral configuration
+
+To use Mistral instead of local Ollama, create an API key in Mistral Studio and set:
+
+```env
+LLM_PROVIDER=mistral
+LLM_MODEL=mistral-small-latest
+MISTRAL_API_KEY=replace-with-your-key
+MISTRAL_BASE_URL=https://api.mistral.ai/v1
+```
+
+Restart Flask after changing `.env`. The synthesis candidates, critic, RAGAS judge,
+token accounting and Langfuse model metadata then use Mistral. Retrieval embeddings
+and the cross-encoder remain local; changing the LLM does not rebuild the document
+index.
 
 ## Flask test interface
 

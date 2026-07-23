@@ -124,7 +124,8 @@ class TokenBudget:
     PRICING = {
         "gpt-4o-mini": (0.15, 0.60),
         "gemini-2.5-flash": (0.30, 2.50),
-        "mistral-large-latest": (2.00, 6.00),
+        "mistral-small-latest": (0.15, 0.60),
+        "mistral-large-latest": (0.50, 1.50),
     }
     DEFAULT = (1.00, 3.00)
 

@@ -4,29 +4,37 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import inspect
 import json
 import sys
 import threading
 import time
 from pathlib import Path
 from typing import Callable
+import warnings
+
+warnings.filterwarnings("ignore")
 
 # Reuse Lab B1/B2's ToolRegistry and tool-schema contract for in-process tool
 # execution. The same domain operations are separately exposed over MCP.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 COURSE_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) in sys.path:
+    sys.path.remove(str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT))
 if str(COURSE_ROOT) not in sys.path:
-    sys.path.insert(0, str(COURSE_ROOT))
+    sys.path.append(str(COURSE_ROOT))
 from llm_helpers import ToolRegistry, tool_schema
 
 try:
     from .guardrails import TokenBudget, Verdict, l1_filter, l4_gate
-    from .observability import flush as flush_langfuse
+    from .observability import current_trace_info, flush as flush_langfuse
     from .observability import observe, update_current_span
     from .reasoning import SYSTEM_PROMPT, self_consistent_answer
     from .retrieval import ClimateRAG
 except ImportError:
     from guardrails import TokenBudget, Verdict, l1_filter, l4_gate
-    from observability import flush as flush_langfuse
+    from observability import current_trace_info, flush as flush_langfuse
     from observability import observe, update_current_span
     from reasoning import SYSTEM_PROMPT, self_consistent_answer
     from retrieval import ClimateRAG
@@ -76,23 +84,55 @@ def get_rag(event_callback: ProgressCallback | None = None) -> ClimateRAG:
     return _RAG_INSTANCE
 
 
-@observe(name="tool_search_evidence", as_type="tool")
+@observe(
+    name="tool_search_evidence",
+    as_type="tool",
+    capture_input=False,
+    capture_output=False,
+)
 def _search_evidence(
     rag: ClimateRAG,
     query: str,
     region: str,
     country: str,
+    event_callback: ProgressCallback | None = None,
 ) -> list[dict]:
-    """Observed read-only tool boundary used by CLI and Flask agent runs."""
-    return rag.search(query, k=4, region=region, country=country)
+    """Observed read-only tool boundary used by CLI and Flask agent runs.
+
+    The RAG object is deliberately excluded from automatic span serialization:
+    it contains models, vectors, indexes, and the complete document corpus.
+    """
+    update_current_span(
+        input={"query": query, "region": region, "country": country},
+        metadata={"tool": "search_evidence"},
+    )
+
+    def retrieval_progress(message: str) -> None:
+        _emit(event_callback, "retrieval", message, message)
+
+    search_arguments = {"k": 4, "region": region, "country": country}
+    if "event_callback" in inspect.signature(rag.search).parameters:
+        search_arguments["event_callback"] = retrieval_progress
+    results = rag.search(query, **search_arguments)
+    update_current_span(
+        output={"result_count": len(results)},
+        metadata={"tool": "search_evidence", "result_count": len(results)},
+    )
+    return results
 
 
-def build_tool_registry(rag: ClimateRAG) -> ToolRegistry:
+def build_tool_registry(
+    rag: ClimateRAG,
+    event_callback: ProgressCallback | None = None,
+) -> ToolRegistry:
     """Adapt the shared Lab registry to the climate-displacement search tool."""
     registry = ToolRegistry()
 
     def search_evidence(query: str, region: str = "", country: str = "") -> str:
-        return json.dumps(_search_evidence(rag, query, region, country), ensure_ascii=False)
+        return json.dumps(
+            _search_evidence(rag, query, region, country, event_callback),
+            ensure_ascii=False,
+        )
 
     registry.register(
         tool_schema(
@@ -171,14 +211,38 @@ def run(
         "Searching trusted reports for relevant evidence.",
         f"Executing BM25+dense retrieval and RRF fusion; metadata filters={filters}.",
     )
-    registry = build_tool_registry(rag)
+    registry = build_tool_registry(rag, event_callback)
     raw_evidence = registry.call(
         "search_evidence", {"query": value, "region": region, "country": country}
     )
     try:
         evidence = json.loads(raw_evidence)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"The Lab tool registry returned invalid evidence JSON: {raw_evidence}") from exc
+    except (json.JSONDecodeError, TypeError):
+        detail = str(raw_evidence)
+        if detail.startswith("ERROR while running"):
+            detail = detail.split(":", 1)[-1].strip()
+        _emit(
+            event_callback, "error",
+            "The document search could not be completed.",
+            f"search_evidence failed: {detail}",
+        )
+        elapsed = time.perf_counter() - started
+        return {
+            "answer": (
+                "I could not search the document library, so I cannot produce a "
+                f"grounded answer. Retrieval error: {detail}"
+            ),
+            "critic": "not run",
+            "sources": [],
+            "metrics": {
+                "latency_s": round(elapsed, 3),
+                "estimated_cost_usd": round(budget.spent, 6),
+                "tool_calls": budget.tool_calls,
+                "agent_version": AGENT_VERSION,
+                "prompt_hash": PROMPT_HASH,
+            },
+            "outcome": "retrieval_error",
+        }
     if not evidence:
         _emit(
             event_callback, "retrieval",
@@ -217,6 +281,7 @@ def run(
         version=AGENT_VERSION,
         metadata={"prompt_hash": PROMPT_HASH, "latency_s": elapsed, "cost_usd": budget.spent},
     )
+    trace = current_trace_info()
     _emit(
         event_callback, "complete",
         "Your evidence briefing is ready.",
@@ -232,6 +297,7 @@ def run(
             "tool_calls": budget.tool_calls,
             "agent_version": AGENT_VERSION,
             "prompt_hash": PROMPT_HASH,
+            **trace,
         },
         "outcome": "completed",
     }
@@ -244,8 +310,31 @@ def main() -> None:
     parser.add_argument("--country", default="")
     args = parser.parse_args()
     question = " ".join(args.question) or input("Question: ").strip()
+
+    stage_labels = {
+        "request": "Request",
+        "security": "Safety",
+        "retrieval": "Evidence",
+        "sanitization": "Sanitization",
+        "reasoning": "Analysis",
+        "critic": "Review",
+        "complete": "Complete",
+        "error": "Error",
+    }
+
+    def show_progress(stage: str, message: str, _admin_message: str = "") -> None:
+        """Print the same user-friendly live stages shown by the Flask interface."""
+        label = stage_labels.get(stage, stage.replace("_", " ").title())
+        print(f"[{label}] {message}", flush=True)
+
     print("\nAI disclosure: this is an AI-generated research brief; verify cited sources.\n")
-    result = run(question, region=args.region, country=args.country)
+    result = run(
+        question,
+        region=args.region,
+        country=args.country,
+        event_callback=show_progress,
+    )
+    print()
     print(result["answer"])
     print("\n--- CRITIC ---\n" + result["critic"])
     if result.get("sources"):
@@ -255,7 +344,24 @@ def main() -> None:
     if result.get("metrics"):
         print("\n--- RUN METRICS ---")
         print(result["metrics"])
-    flush_langfuse()
+    trace_url = result.get("metrics", {}).get("trace_url")
+    trace_id = result.get("metrics", {}).get("trace_id")
+    if trace_url:
+        print(f"\n--- LANGFUSE TRACE ---\n{trace_url}")
+    elif trace_id:
+        print(
+            "\n--- LANGFUSE TRACE ---\n"
+            f"Trace ID: {trace_id}\n"
+            "Open your Langfuse project and search for this trace ID."
+        )
+    elif result.get("metrics"):
+        print("\n--- LANGFUSE TRACE ---\nNo trace ID was created; check the Langfuse keys.")
+
+    if not flush_langfuse():
+        print(
+            "Trace export did not finish within 8 seconds. The answer is complete; "
+            "check LANGFUSE_BASE_URL, connectivity, or proxy settings."
+        )
 
 
 if __name__ == "__main__":

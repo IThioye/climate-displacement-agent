@@ -54,7 +54,13 @@ class LocalHashEmbeddings(Embeddings):
 
 def judge_components():
     provider = os.getenv("LLM_PROVIDER", "ollama").lower()
-    model = os.getenv("LLM_MODEL", "gemma3:4b")
+    provider_defaults = {
+        "ollama": "gemma3:4b",
+        "mistral": "mistral-small-latest",
+        "openai": "gpt-4o-mini",
+        "google": "gemini-2.5-flash",
+    }
+    model = os.getenv("LLM_MODEL") or provider_defaults.get(provider, "gemma3:4b")
     if provider == "ollama":
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
         api_key = os.getenv("OLLAMA_API_KEY", "ollama")
@@ -67,6 +73,10 @@ def judge_components():
         base_url = os.getenv("OPENAI_BASE_URL")
         api_key = os.environ["OPENAI_API_KEY"]
         embeddings = OpenAIEmbeddings(api_key=api_key, base_url=base_url)
+    elif provider == "mistral":
+        base_url = os.getenv("MISTRAL_BASE_URL", "https://api.mistral.ai/v1")
+        api_key = os.environ["MISTRAL_API_KEY"]
+        embeddings = LocalHashEmbeddings()
     else:
         raise ValueError(f"RAGAS requires an OpenAI-compatible provider, got {provider!r}")
     judge = ChatOpenAI(
